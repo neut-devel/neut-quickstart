@@ -1,0 +1,205 @@
+#!/bin/bash
+
+SUBCOMMAND=${1}
+
+case $SUBCOMMAND in
+
+  neut)
+cat << 'EOF' |
+# NEUT
+
+Reference: https://link.springer.com/article/10.1140/epjs/s11734-021-00287-7
+
+This container image has NEUT v5.8.0, which is the latest 'production'
+version, including some new electron-scatering probe developments.
+
+## nu-A generator
+
+The main neutrino generator is run with the neutroot2 program. Run like:
+
+<pre>
+
+    $ neutroot2 config.card [output.root]
+</pre>
+
+The container ships some example configuration cards at ${NEUT_CARDS}. A good
+one to start with is:
+
+<pre>
+
+    /opt/neut/5.8.0/share/neut/Cards/neut_5.4.0_1GeV_C.card
+</pre>
+
+The most important options for generating different experimental 
+configurations are:
+
+<pre>
+
+    C The number of events to generator
+    EVCT-NEVT  10000
+
+    C Edit the below to specify a ROOT flux file/histogram
+    EVCT-MPV 3
+    EVCT-FILENM '/path/to/file.root'
+    EVCT-HISTNM 'numu_flux'
+    EVCT-INMEV 0
+
+    C Modify the below to change the nuclear target, optionally with some number
+    C of free protons. C, CH, O, H2O are possible, compound targets are not.
+    NEUT-NUMBNDN 6
+    NEUT-NUMBNDP 6
+    NEUT-NUMFREP 0
+    NEUT-NUMATOM 12
+</pre>
+
+The output file produced can be analysed directly, but we strongly recommend
+using NUISANCE to perform any analysis on neutvect files.
+
+## Pi-A generator
+
+NOT YET DOCUMENTED
+
+## N-A generator
+
+NOT YET DOCUMENTED
+
+EOF
+markdown_py | lynx -stdin
+  ;;
+
+  neutroot2)
+cat << 'EOF' |
+NO HELP YET
+EOF
+
+markdown_py | lynx -stdin
+  ;;
+
+  neutvect-converter)
+cat << 'EOF' |
+NO HELP YET
+EOF
+
+markdown_py | lynx -stdin
+  ;;
+
+  neut-quickstart)
+cat << 'EOF' |
+
+# neut-quickstart
+
+neut-quickstart is a simple bash script that adds a proper CLI to the core NEUT, neutroot2 binary. It
+allows you to generate some NEUT events by specifying high-level configuration options on the command
+line. For example, the below would generate 123456 numubar on water events in some flux specified
+by the histogram 'flux' in root file 'myflux.root'. In addition to steering the generation of events,
+neut-quickstart will automatically convert the NEUT native neutvect.root output file to a common
+NuHepMC format file.
+
+For more information on using NuHepMC files, see here: https://github.com/NuHepMC/cpputils 
+
+<pre>
+
+  $ ./neut-quickstart --help
+    Required options:
+    -o|--output <filename.hepmc3>  : Output HepMC3 file
+    -n|--nevents <numevents>          : Specify the number of events to process or generate.
+
+    Options:
+    --neut-card <neut.card>        : NEUT card to specialize
+    --neut-param <pname> <val>     : Specify arbitrary NEUT parameters.
+                                     This will override parameters in the base card or set elsewhere 
+                                     in this script.
+                                     This can be used more than once.
+    -t|--target <C|O|CH|H2O|Fe>       : Specify the target nucleus/molecule.
+    -s|--species <nu[mu,e][,b]>       : Specify the neutrino species.
+    -f|--flux <file.root><,histname>  : Throw an event rate according to flux * cross section. 
+                                     Flux histogram should be binned in GeV.
+    --uniform <from> <to>          : Throw a uniform event rate as a function of energy in MeV.
+    --mono-E <E>                   : Throw a events with energy E in MeV.
+
+    --verbose                      : Let NEUT say its thing
+    --force                        : Continue even if output file already exists
+    --debug                        : Copy NEUT card file and intermediate neutvect.root file, if it
+                                     iexists, back to the output directory.
+
+    --help                         : Print this message
+</pre>
+EOF
+markdown_py | lynx -stdin
+  ;;
+
+  docker_run)
+cat << 'EOF' |
+
+The below shell function can be used to launch and attach to an ephemeral docker container while bind mounting 
+the host users' home directory. This makes it function a bit more like apptainer shell from a user's perspective.
+
+<pre>
+
+
+    function docker_run {
+      set -x
+      # Get a sanitised version of the full container name
+      local CONT_NAME=$(echo ${1} | sed "s|.*/\(.*\):.*|\1|g" )
+      # Checks if you are currently in a subdir of your homedir
+      local STRIPPED
+      local LOC=$(pwd -P)/
+      case ${LOC} in
+        ${HOME}/*)
+        local STRIPPED=${LOC##${HOME}/}
+        ;;
+      esac
+      # If you are, mount it in the container and start in it
+      if [ ! -z ${STRIPPED} ]; then
+        docker run --privileged -it --rm --volume ${HOME}:/root  \
+          -e CONT_NAME=${CONT_NAME} -e PS1="\[\e[1m\e[31m\]${CONT_NAME}\[\e(B\e[m\]:\[\e[1m\e[32m\]\$(basename \$(pwd)) $\[\e(B\e[m\] " \
+          -w /root/${STRIPPED} "${@}"
+      else
+      # Otherwise, assume that you probably want your home directory mounted 
+        docker run --privileged -it --rm --volume ${HOME}:/root \
+              -e CONT_NAME=${CONT_NAME} -e PS1="\[\e[1m\e[31m\]${CONT_NAME}\[\e(B\e[m\]:\[\e[1m\e[32m\]\$(basename \$(pwd)) $\[\e(B\e[m\] " \
+              -w /root "$@"
+      fi
+    }
+</pre>
+EOF
+markdown_py | lynx -stdin
+
+  ;;
+
+  *)
+cat << 'EOF' |
+# Halp
+
+## Installed Software
+
+All non-system software is installed to /opt.
+
+The majority of the software is available in the environment from the start.
+
+See, e.g.
+
+<pre>
+    $ which neutroot2
+</pre>
+
+Check the full environment with:
+
+<pre>
+    $ printenv
+</pre>
+
+Sub-halp commands exist for software-specific help, try:
+
+<pre>
+    $ halp neut
+    $ halp neutroot2
+    $ halp neutvect-converter
+    $ halp neut-quickstart
+    $ halp docker_run
+</pre>
+EOF
+markdown_py | lynx -stdin
+  ;;
+
+esac
