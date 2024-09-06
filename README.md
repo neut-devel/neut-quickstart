@@ -35,9 +35,9 @@ Installed Software
 ```
 
 Enter the container like: `docker run -it --rm picker24/neut580_quickstart:alma9`. 
-For advice on a docker interface with slightly improved QOL, see [docker_run](#docker_run).
+For advice on a `docker` interface with slightly improved QOL, see [docker_run](#docker_run).
 
-Run `neut-quickstart --help` within the container to see the option for a high-level generator CLI:
+Run `neut-quickstart --help` within the container to see the options for an included high-level NEUT CLI:
 
 ```bash
 $ neut-quickstart --help
@@ -66,7 +66,7 @@ $ neut-quickstart --help
   --help                         : Print this message
 ```
 
-To throw 100 nue events on a water target with a 5 GeV mono-energetic beam, you might run:
+To throw 100 numu events on a water target with a 5 GeV mono-energetic beam, you might run:
 
 ```bash
 $ neut-quickstart -n 100 -t H2O --mono-E 5000 -o H2O.tiny.5GeV.hepmc3
