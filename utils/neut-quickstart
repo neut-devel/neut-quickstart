@@ -2,8 +2,12 @@
 
 function helpme {
   echo -e "  Required options:"
-  echo -e "\t-o|--output <filename.hepmc3>  : Output HepMC3 file"
-  echo -e "\t-n|--nevents <numevents>          : Specify the number of events to process or generate."
+  echo -e "\t-o|--output <filename.<ext>>  : Output neut file, <ext>=[hepmc3, root]"
+  echo -e "\t-n|--nevents <numevents>       : Specify the number of events to process or generate."
+  echo -e ""
+  echo -e "  Or: "
+  echo -e ""
+  echo -e "\t--output-card <filename.card>  : Output card file"
   echo -e ""
   echo -e "  Options:"
   echo -e "\t--neut-card <neut.card>        : NEUT card to specialize"
@@ -52,6 +56,7 @@ FORCE="0"
 declare -A NEUT_PARAMS
 
 OUTPUTFILE=
+OUTPUTCARD=
 
 set -e
 
@@ -69,6 +74,18 @@ while [[ ${#} -gt 0 ]]; do
 
       OUTPUTFILE="${2}"
       echo "[OPT]: Writing final output to ${OUTPUTFILE}"
+      shift # past argument
+      ;;
+
+    --output-card)
+
+      if [[ ${#} -lt 2 ]]; then
+        echo "[ERROR]: ${1} expected a value."
+        exit 1
+      fi
+
+      OUTPUTCARD="${2}"
+      echo "[OPT]: Writing output card file to ${OUTPUTCARD}"
       shift # past argument
       ;;
 
@@ -202,17 +219,6 @@ while [[ ${#} -gt 0 ]]; do
   shift # past argument or value
 done
 
-if [ -z "${OUTPUTFILE}" ]; then
-  echo "[ERROR]: Expected to be passed an output file name with -o"
-  helpme
-  exit 1
-fi
-
-if [ "${FORCE}" == "0" ] && [ -e "${OUTPUTFILE}" ]; then
-  echo "[ERROR]: Not overwriting output file without --force"
-  exit 1
-fi
-
 if [ ! -e ${NEUT_CARD} ]; then
   echo "[ERROR]: No such card file: ${NEUT_CARD}"
   exit 1
@@ -247,6 +253,12 @@ elif [ "${TARGET}" == "H2O" ]; then
   NEUT_PARAMS[NEUT-NUMBNDP]=8
   NEUT_PARAMS[NEUT-NUMFREP]=2
   NEUT_PARAMS[NEUT-NUMATOM]=16
+elif [ "${TARGET}" == "Ar" ]; then
+  NEUT_PARAMS[NEUT-NUMBNDN]=22
+  NEUT_PARAMS[NEUT-NUMBNDP]=18
+  NEUT_PARAMS[NEUT-NUMFREP]=0
+  NEUT_PARAMS[NEUT-NUMATOM]=40
+  NEUT_PARAMS[NEUT-MDLQE]=02
 elif [ "${TARGET}" == "Fe" ]; then
   NEUT_PARAMS[NEUT-NUMBNDN]=30
   NEUT_PARAMS[NEUT-NUMBNDP]=26
@@ -305,9 +317,15 @@ if [ ! -z "${USE_FLUX}" ]; then
   NEUT_PARAMS[EVCT-INMEV]="0"
 fi
 
-FQP_RUNSCRIPT=$(readlink -f ${SCRIPTDIR}/run.sh)
-FQP_OUTPUTFILE=$(readlink -f ${OUTPUTFILE})
-BASENAME_OUTPUTFILE=$(basename ${OUTPUTFILE})
+
+if [ ! -z "${OUTPUTFILE}" ]; then
+  FQP_OUTPUTFILE=$(readlink -f ${OUTPUTFILE})
+  BASENAME_OUTPUTFILE=$(basename ${OUTPUTFILE})
+fi
+
+if [ ! -z "${OUTPUTCARD}" ]; then
+  FQP_OUTPUTCARD=$(readlink -f ${OUTPUTCARD})
+fi
 
 THISRANDOM=${RANDOM}
 RUNDIR="/tmp/neut-quickstart/${THISRANDOM}"
@@ -326,14 +344,33 @@ for NEUT_PARAM in "${!NEUT_PARAMS[@]}"; do
   SetNeutParam NEUT.card ${NEUT_PARAM} "${NEUT_PARAMS[${NEUT_PARAM}]}"
 done
 
-FQP_BASENAME_OUTPUTFILE=$(readlink -f ${BASENAME_OUTPUTFILE})
 FQP_CARDNAME=$(readlink -f NEUT.card)
-DIRNAME_OUTPUTFILE=$(dirname ${OUTPUTFILE})
 
 if [ "${DEBUG}" == "1" ]; then
   NEUT_CARD_OUT=NEUT.${THISRANDOM}.card
   echo "[INFO]: Placing NEUT card in: ${NEUT_CARD_OUT}"
   cp ${FQP_CARDNAME} ${OLDPWD}/${NEUT_CARD_OUT}
+fi
+
+if [ ! -z "${OUTPUTCARD}" ]; then
+  cp NEUT.card ${FQP_OUTPUTCARD}
+  if [ -z "${OUTPUTFILE}" ]; then
+    exit 0
+  fi
+fi
+
+FQP_BASENAME_OUTPUTFILE=$(readlink -f ${BASENAME_OUTPUTFILE})
+DIRNAME_OUTPUTFILE=$(dirname ${OUTPUTFILE})
+
+if [ -z "${OUTPUTFILE}" ]; then
+  echo "[ERROR]: Expected to be passed an output file name with -o"
+  helpme
+  exit 1
+fi
+
+if [ "${FORCE}" == "0" ] && [ -e "${OUTPUTFILE}" ]; then
+  echo "[ERROR]: Not overwriting output file without --force"
+  exit 1
 fi
 
 if [ "${QUIET}" == "0" ]; then
@@ -348,12 +385,22 @@ if [ -e "neutvect.root" ]; then
     echo "[INFO]: Placing NEUT neutvect.root in: ${NEUT_VECT_OUT}"
     cp neutvect.root ${OLDPWD}/${NEUT_VECT_OUT}
   fi
-  if [ ! -z "${FLUX_FILE_BASENAME}" ]; then
-    neutvect-converter -i neutvect.root -f "${FLUX_FILE_BASENAME},${FLUX_HIST}" -o ${FQP_BASENAME_OUTPUTFILE}
-  else
-    neutvect-converter -i neutvect.root -o ${FQP_BASENAME_OUTPUTFILE}
-  fi
 
+  EXTENSION_OUTPUTFILE="${BASENAME_OUTPUTFILE##*.}"
+
+  if [ "${EXTENSION_OUTPUTFILE}" == "hepmc3" ]; then
+    if [ ! -z "${FLUX_FILE_BASENAME}" ]; then
+      neutvect-converter -i neutvect.root -f "${FLUX_FILE_BASENAME},${FLUX_HIST}" -o ${FQP_BASENAME_OUTPUTFILE}
+    else
+      neutvect-converter -i neutvect.root -o ${FQP_BASENAME_OUTPUTFILE}
+    fi
+  elif [ "${EXTENSION_OUTPUTFILE}" == "root" ]; then
+    mv neutvect.root  ${FQP_BASENAME_OUTPUTFILE}
+  else
+    OUTPUTFILE="${OUTPUTFILE}.root"
+    echo "[ERROR]: Invalid output file extension, writing to ${OUTPUTFILE} instead."
+    mv neutvect.root  ${FQP_BASENAME_OUTPUTFILE}
+  fi
   cd ${OLDPWD}
 
   cp ${FQP_BASENAME_OUTPUTFILE} ${OUTPUTFILE}
@@ -361,6 +408,8 @@ if [ -e "neutvect.root" ]; then
   rm -r ${RUNDIR}
 
 else
+
+  echo "[ERROR]: NEUT run failed to produce expected output file (neutvect.root)."
 
   cd ${OLDPWD}
 

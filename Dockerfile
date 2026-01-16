@@ -1,4 +1,4 @@
-FROM picker24/neut580vect_converter:alma9 
+FROM picker24/neut_580:alma9 
 
 RUN dnf install -y python3-markdown lynx
 
